@@ -1,0 +1,9 @@
+streamlit>=1.45
+pandas
+numpy
+nltk
+textstat
+plotly
+joblib
+scikit-learn==1.6.1
+xgboost==3.4.1
