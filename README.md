@@ -28,9 +28,3 @@ streamlit run app.py
 
 Trained on the Kaggle [AI vs Human Text](https://www.kaggle.com/datasets/shanegerami/ai-vs-human-text) dataset plus Wikipedia/GPT intro pairs. Models compared: Logistic Regression, Random Forest, XGBoost.
 
-## Limitations
-
-- Formal human writing (research papers, encyclopedias) can be flagged as AI-like.
-- The model only knows the text types and generators it was trained on.
-- Input must be at least 100 words and 3 sentences.
-

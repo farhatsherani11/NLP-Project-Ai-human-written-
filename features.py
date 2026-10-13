@@ -1,6 +1,6 @@
 """
 Feature extraction for the Human vs AI Writing Pattern Analyzer.
-This MUST stay identical to the extract_features() used in the Colab notebook.
+Created by the training notebook. Keep this file next to app.py.
 """
 import re
 from collections import Counter
@@ -9,17 +9,25 @@ import nltk
 import numpy as np
 import textstat
 
-for _pkg in ["punkt", "punkt_tab", "averaged_perceptron_tagger", "averaged_perceptron_tagger_eng"]:
-    nltk.download(_pkg, quiet=True)
+for _res, _pkg in [("tokenizers/punkt", "punkt"), ("tokenizers/punkt_tab", "punkt_tab"),
+                   ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+                   ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng")]:
+    try:
+        nltk.data.find(_res)
+    except LookupError:
+        nltk.download(_pkg, quiet=True)
+
+CHUNK_WORDS = 150      # every text is analysed in sections of about this many words
 
 WORD_RE        = re.compile(r"[A-Za-z']+")
 CONTRACTION_RE = re.compile(r"\b\w+(?:n't|'re|'ve|'ll|'m|'d)\b", re.I)
 PASSIVE_RE     = re.compile(r"\b(?:is|are|was|were|be|been|being)\s+\w+ed\b", re.I)
+CITATION_RE    = re.compile(r"\[(?:\w{1,4}|citation needed)\](?::\d+(?:[–-]\d+)?)?", re.I)
 FIRST_PERSON   = {"i", "me", "my", "mine", "we", "us", "our", "ours"}
 
 
 def clean_text(text):
-    text = re.sub(r"\[\w{1,4}\]", "", text)          # citation marks like [a], [12]
+    text = CITATION_RE.sub("", text)                  # citation marks like [a], [12], [5]:10–11
     text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)      # single line break = wrapped line
     return text.strip()
 
@@ -39,6 +47,26 @@ def repeat_ratio(tokens, n):
     return sum(c for c in counts.values() if c > 1) / len(grams)
 
 
+def split_chunks(text, size=CHUNK_WORDS, min_last=100):
+    """Cut a text into consecutive sections of ~size words, always ending at a sentence end.
+    A leftover shorter than min_last words is merged into the previous section."""
+    sents = nltk.sent_tokenize(clean_text(text))
+    chunks, cur, n = [], [], 0
+    for s in sents:
+        cur.append(s)
+        n += len(WORD_RE.findall(s))
+        if n >= size:
+            chunks.append((" ".join(cur), n))
+            cur, n = [], 0
+    if cur:
+        if chunks and n < min_last:
+            prev, pn = chunks[-1]
+            chunks[-1] = (prev + " " + " ".join(cur), pn + n)
+        else:
+            chunks.append((" ".join(cur), n))
+    return [c for c, _ in chunks] or [clean_text(text)]
+
+
 def text_stats(text):
     """Basic counts used for input validation and charts."""
     text = clean_text(text)
@@ -48,6 +76,12 @@ def text_stats(text):
         "n_sentences": len(sentences),
         "sentence_lengths": [len(WORD_RE.findall(s)) for s in sentences],
     }
+
+
+def paragraph_stats(text):
+    paras = [p for p in re.split(r"\n\s*\n", clean_text(text)) if p.strip()]
+    lens = [len(WORD_RE.findall(p)) for p in paras]
+    return {"n_paragraphs": len(paras), "avg_para_len": float(np.mean(lens)) if lens else 0.0}
 
 
 def repeated_phrases(text, n=2, top=8):
